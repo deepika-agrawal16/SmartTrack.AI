@@ -1,0 +1,23 @@
+2025-05-30 15:59:25.346 +05:30 [INF] This only goes file...
+2025-05-30 15:59:26.121 +05:30 [INF] Foo
+2025-05-30 15:59:26.235 +05:30 [DBG] Finding descriptors for initialize
+2025-05-30 15:59:26.785 +05:30 [DBG] Queueing "Serial":initialize:0 request for processing
+2025-05-30 15:59:26.816 +05:30 [DBG] Starting: Processing request initialize 0
+2025-05-30 15:59:26.818 +05:30 [DBG] Starting: Routing Request (0) initialize
+2025-05-30 15:59:26.822 +05:30 [VRB] Converting params for Request (0) initialize to OmniSharp.Extensions.LanguageServer.Protocol.Models.InternalInitializeParams
+2025-05-30 15:59:26.823 +05:30 [VRB] Converting params for Notification initialize to OmniSharp.Extensions.LanguageServer.Protocol.Models.InternalInitializeParams
+2025-05-30 15:59:27.627 +05:30 [VRB] Response value was OmniSharp.Extensions.LanguageServer.Protocol.Models.InitializeResult
+2025-05-30 15:59:27.677 +05:30 [DBG] Finished: Routing Request (0) initialize in 858ms
+2025-05-30 15:59:27.679 +05:30 [DBG] Finished: Processing request initialize 0 in 862ms
+2025-05-30 15:59:27.771 +05:30 [DBG] Finding descriptors for initialized
+2025-05-30 15:59:27.773 +05:30 [DBG] Queueing "Serial":initialized request for processing
+2025-05-30 15:59:27.783 +05:30 [DBG] Starting: Processing notification initialized
+2025-05-30 15:59:27.784 +05:30 [DBG] Starting: Routing Notification initialized
+2025-05-30 15:59:27.785 +05:30 [VRB] Converting params for Notification initialized to OmniSharp.Extensions.LanguageServer.Protocol.Models.InitializedParams
+2025-05-30 15:59:27.855 +05:30 [WRN] No ConfigurationItems have been defined, configuration won't surface any configuration from the client!
+2025-05-30 15:59:27.900 +05:30 [DBG] Finished: Routing Notification initialized in 114ms
+2025-05-30 15:59:27.900 +05:30 [DBG] Finished: Processing notification initialized in 115ms
+2025-06-03 21:40:53.036 +05:30 [VRB] Could not write to output handler, perhaps serialization failed?
+System.Threading.Channels.ChannelClosedException: The channel has been closed.
+   at System.Threading.Channels.AsyncOperation`1.GetResult(Int16 token)
+   at OmniSharp.Extensions.JsonRpc.OutputHandler.ProcessOutputStream(CancellationToken cancellationToken)

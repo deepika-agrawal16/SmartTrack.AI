@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920584802323",
+    "project_id": "aifinancemanager-7944a",
+    "storage_bucket": "aifinancemanager-7944a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920584802323:android:ea32e861961645c0372fe6",
+        "android_client_info": {
+          "package_name": "com.example.aifinanceapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPWi2PIDm4OC1gKvGN6C2LETaQR7e7zGU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
