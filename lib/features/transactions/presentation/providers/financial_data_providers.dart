@@ -54,23 +54,31 @@ class FinancialState {
 class PeriodSummary {
   final double totalIncome;
   final double totalExpense;
+  final double totalDebitAndLoan; // NEW: Added for dashboard summary
+  final double totalRepay; // NEW: Added for dashboard summary
   final Map<String, double>
-  categoryExpenses; // For charting - **will be removed if charts are removed from UI**
+      categoryExpenses; // For charting - **will be removed if charts are removed from UI**
 
   PeriodSummary({
     this.totalIncome = 0.0,
     this.totalExpense = 0.0,
+    this.totalDebitAndLoan = 0.0, // Initialize new fields
+    this.totalRepay = 0.0,        // Initialize new fields
     this.categoryExpenses = const {},
   });
 
   PeriodSummary copyWith({
     double? totalIncome,
     double? totalExpense,
+    double? totalDebitAndLoan,
+    double? totalRepay,
     Map<String, double>? categoryExpenses,
   }) {
     return PeriodSummary(
       totalIncome: totalIncome ?? this.totalIncome,
       totalExpense: totalExpense ?? this.totalExpense,
+      totalDebitAndLoan: totalDebitAndLoan ?? this.totalDebitAndLoan,
+      totalRepay: totalRepay ?? this.totalRepay,
       categoryExpenses: categoryExpenses ?? this.categoryExpenses,
     );
   }
@@ -79,7 +87,7 @@ class PeriodSummary {
 // Provider for TransactionFirestoreService
 @Riverpod(keepAlive: true)
 TransactionFirestoreService transactionFirestoreService(
-  TransactionFirestoreServiceRef ref,
+    TransactionFirestoreServiceRef ref,
 ) {
   return TransactionFirestoreService();
 }
@@ -166,7 +174,7 @@ Stream<Map<String, dynamic>?> currentUserProfile(CurrentUserProfileRef ref) {
 class SelectedTimePeriodNotifier extends _$SelectedTimePeriodNotifier {
   @override
   TimePeriod build() {
-    return TimePeriod.all; // Default to 'All' transactions on dashboard open
+    return TimePeriod.month; // Default to 'Month' as it's a common dashboard focus.
   }
 
   void setPeriod(TimePeriod period) {
@@ -228,7 +236,7 @@ Stream<List<Transaction>> filteredTransactions(FilteredTransactionsRef ref) {
   );
 }
 
-// Provider for filtered financial summary (income/expense/category breakdown) based on selected period
+// Provider for filtered financial summary (income/expense/category breakdown, and now debit/repay) based on selected period
 @Riverpod(keepAlive: true)
 class FilteredPeriodSummaryNotifier extends _$FilteredPeriodSummaryNotifier {
   @override
@@ -239,25 +247,32 @@ class FilteredPeriodSummaryNotifier extends _$FilteredPeriodSummaryNotifier {
       data: (transactions) {
         double totalIncome = 0.0;
         double totalExpense = 0.0;
+        double totalDebitAndLoan = 0.0; // NEW
+        double totalRepay = 0.0;        // NEW
         Map<String, double> categoryExpenses =
             {}; // Still keeping this for now, but if charts are removed, this might become redundant.
 
         for (var transaction in transactions) {
           if (transaction.type.toLowerCase() == 'income') {
             totalIncome += transaction.amount;
-          } else if (transaction.type.toLowerCase() == 'expense' ||
-              transaction.type.toLowerCase() == 'debit & loan') {
+          } else if (transaction.type.toLowerCase() == 'expense') {
             totalExpense += transaction.amount;
             categoryExpenses.update(
               transaction.category ?? 'Uncategorized',
               (value) => value + transaction.amount,
               ifAbsent: () => transaction.amount,
             );
+          } else if (transaction.type.toLowerCase() == 'debit & loan') { // NEW
+            totalDebitAndLoan += transaction.amount;
+          } else if (transaction.type.toLowerCase() == 'repay') { // NEW
+            totalRepay += transaction.amount;
           }
         }
         return PeriodSummary(
           totalIncome: totalIncome,
           totalExpense: totalExpense,
+          totalDebitAndLoan: totalDebitAndLoan, // Pass the new totals
+          totalRepay: totalRepay,              // Pass the new totals
           categoryExpenses:
               categoryExpenses, // Still included, but can be removed if not used for anything else.
         );
@@ -317,6 +332,8 @@ class FinancialDataNotifier extends _$FinancialDataNotifier {
 
     final now = DateTime.now();
     // Filter transactions for the current month to calculate monthly totals
+    // Note: The FinancialDataNotifier focuses on the current month for BUDGET.
+    // The FilteredPeriodSummaryNotifier will handle other time periods.
     final currentMonthTransactions = transactions.where((t) {
       return t.date.year == now.year && t.date.month == now.month;
     }).toList();
@@ -325,7 +342,7 @@ class FinancialDataNotifier extends _$FinancialDataNotifier {
       if (transaction.type.toLowerCase() == 'income') {
         totalIncomeForMonth += transaction.amount;
       } else if (transaction.type.toLowerCase() == 'expense' ||
-          transaction.type.toLowerCase() == 'debit & loan') {
+          transaction.type.toLowerCase() == 'debit & loan') { // Include debit & loan as 'expense' for budget calculation
         totalExpenseForMonth += transaction.amount;
       }
     }

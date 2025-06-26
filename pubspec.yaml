@@ -54,6 +54,7 @@ dependencies:
   google_generative_ai: ^0.2.0
   firebase_app_check: ^0.3.2+7 # Firebase App Check
   fl_chart: ^0.68.0
+  shimmer: ^3.0.0
 
 
 dev_dependencies:

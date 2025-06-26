@@ -1,34 +1,35 @@
-// ignore_for_file: unused_import
+// ignore_for_file: unused_import, deprecated_member_use
 
 import 'dart:io';
 import 'package:aifinanceapp/features/transactions/presentation/screens/pocket_screen.dart';
+import 'package:aifinanceapp/features/transactions/presentation/screens/stats_screen.dart';
+import 'package:aifinanceapp/features/transactions/presentation/screens/wallet_screen.dart';
 import 'package:aifinanceapp/services/ai_chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Keep this import for getting current user ID
-import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction; // Keep hide Transaction for now, though not strictly needed here
+import 'package:cloud_firestore/cloud_firestore.dart'
+    hide
+        Transaction; // Keep hide Transaction for now, though not strictly needed here
 import 'package:aifinanceapp/features/transactions/presentation/screens/add_transaction_screen.dart';
-import 'package:aifinanceapp/features/transactions/presentation/providers/financial_data_providers.dart' hide currentUserProfileProvider;
+import 'package:aifinanceapp/features/transactions/presentation/providers/financial_data_providers.dart'
+    hide currentUserProfileProvider; // Import all providers
 import 'package:aifinanceapp/features/transactions/presentation/screens/set_monthly_budget_screen.dart';
 import 'package:aifinanceapp/features/onboarding/presentation/providers/user_profile_providers.dart';
 import 'package:aifinanceapp/features/transactions/data/models/transaction_model.dart'; // Import Transaction model
-
-// NEW: Riverpod provider for the selected time period
-final selectedTimePeriodProvider = StateProvider<String>((ref) => 'This Month'); // Default to 'This Month'
-
+// You'll need this if CategoryIconMapping is defined in pocket_screen.dart
+import 'package:aifinanceapp/features/transactions/presentation/screens/pocket_screen.dart'
+    as pocket_screen;
 
 class DashboardScreen extends ConsumerStatefulWidget {
   static const double _bottomNavHeight = 56.0;
 
   final String userName;
-  final File? profileImage; // This might be used for initial display right after setup
+  final File?
+      profileImage; // This might be used for initial display right after setup
 
-  const DashboardScreen({
-    super.key,
-    required this.userName,
-    this.profileImage,
-  });
+  const DashboardScreen({super.key, required this.userName, this.profileImage});
 
   @override
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
@@ -38,15 +39,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch user profile when the dashboard initializes to get the latest data (including image URL)
-    ref.read(userProfileNotifierProvider.notifier).fetchUserProfile();
+    // Schedule the provider modifications to run after the current frame is built.
+    // This prevents the "Tried to modify a provider while the widget tree was building" error.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Fetch user profile when the dashboard initializes to get the latest data (including image URL)
+      ref.read(userProfileNotifierProvider.notifier).fetchUserProfile();
+      // Set the default period for the dashboard summaries to 'month'
+      ref.read(selectedTimePeriodNotifierProvider.notifier).setPeriod(TimePeriod.month); // Or TimePeriod.all
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // financialState will give us current month's budget details
     final financialState = ref.watch(financialDataNotifierProvider);
+    // periodSummary will give us income/expense/debit/repay for the selected period (defaulting to month)
+    final periodSummary = ref.watch(filteredPeriodSummaryNotifierProvider);
+
     final userProfileAsyncValue = ref.watch(currentUserProfileProvider);
-    final userTransactionsAsyncValue = ref.watch(userTransactionsProvider);
+    final userTransactionsAsyncValue =
+        ref.watch(filteredTransactionsProvider); // Use filtered transactions here
 
     String currentUserName = widget.userName;
     String? currentProfileImageUrl;
@@ -85,16 +97,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: TimeTabs(),
-            ),
-            const SizedBox(height: 20),
+            // Removed TimeTabs here as requested
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SummaryBoxes(
-                income: financialState.totalIncome,
-                expense: financialState.totalExpense,
+                income: periodSummary.totalIncome, // Use periodSummary for these totals
+                expense: periodSummary.totalExpense, // Use periodSummary for these totals
+              ),
+            ),
+            const SizedBox(height: 10), // Reduced space slightly
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: LoanRepaySummaryBoxes(
+                // New widget for Debit & Loan and Repay
+                debitAndLoan:
+                    periodSummary.totalDebitAndLoan, // Use periodSummary for these totals
+                repay: periodSummary.totalRepay, // Use periodSummary for these totals
               ),
             ),
             const SizedBox(height: 20),
@@ -102,12 +120,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: BudgetBox(
                 monthlyBudget: financialState.monthlyBudget,
-                totalExpense: financialState.totalExpense,
+                totalExpense: financialState
+                    .totalExpense, // This is current month's expense for budget comparison
                 dailyBudget: financialState.dailyBudget,
                 onSetBudget: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                        builder: (_) => const SetMonthlyBudgetScreen()),
+                      builder: (_) => const SetMonthlyBudgetScreen(),
+                    ),
                   );
                 },
               ),
@@ -120,14 +140,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("Transactions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text(
+                      "Transactions",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     TextButton(
                       onPressed: () {
-                        // TODO: Implement "See all" functionality
+                        // Navigate to PocketScreen and set its filter to TimePeriod.all
+                        ref
+                            .read(selectedTimePeriodNotifierProvider.notifier)
+                            .setPeriod(TimePeriod.all);
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (context) => const PocketScreen()));
                       },
                       child: const Text(
                         "See all",
-                        style: TextStyle(color: Color(0xFF3062CE), fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: Color(0xFF3062CE),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -152,10 +187,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         ),
                       );
                     }
-                    return TransactionsList(transactions: transactions);
+                    // Show only a few recent transactions on the dashboard, e.g., last 5
+                    final recentTransactions = transactions.take(5).toList();
+                    return TransactionsList(transactions: recentTransactions);
                   },
                   loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (err, stack) => Center(child: Text('Error loading transactions: $err')),
+                  error: (err, stack) =>
+                      Center(child: Text('Error loading transactions: $err')),
                 ),
               ),
             ),
@@ -167,7 +205,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-// HeaderSection and other widgets remain unchanged
+// HeaderSection remains unchanged
 class HeaderSection extends StatelessWidget {
   final String userName;
   final File? profileImage;
@@ -213,11 +251,9 @@ class HeaderSection extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.add_circle, color: blue, size: 32),
           onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const AddTransaction(),
-              ),
-            );
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AddTransaction()));
           },
         ),
       ],
@@ -225,63 +261,7 @@ class HeaderSection extends StatelessWidget {
   }
 }
 
-// MODIFIED: TimeTabs to be a ConsumerWidget and interact with the provider
-class TimeTabs extends ConsumerWidget {
-  const TimeTabs({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selectedPeriod = ref.watch(selectedTimePeriodProvider);
-    final List<String> timePeriods = ["This Week", "This Month", "This Year"];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: timePeriods.map((period) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 5), // Adjust spacing
-            child: TimeTab(
-              title: period,
-              isSelected: selectedPeriod == period,
-              onTap: () {
-                ref.read(selectedTimePeriodProvider.notifier).state = period;
-                // TODO: Add logic here to filter financial data based on 'period'
-                // This could involve invalidating a provider that fetches transactions
-                // or updating parameters for existing data providers.
-                print('Selected time period: $period'); // For demonstration
-              },
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-// MODIFIED: TimeTab to accept an onTap callback
-class TimeTab extends StatelessWidget {
-  final String title;
-  final bool isSelected;
-  final VoidCallback? onTap; // NEW: Added onTap callback
-
-  const TimeTab({super.key, required this.title, this.isSelected = false, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final bgColor =
-        isSelected ? const Color(0xFF3062CE) : Colors.grey.shade200;
-    final textColor = isSelected ? Colors.white : Colors.black;
-    return GestureDetector( // Wrapped with GestureDetector to make it tappable
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10)),
-        child: Text(title, style: TextStyle(color: textColor)),
-      ),
-    );
-  }
-}
+// Removed TimeTabs and TimeTab as requested
 
 class SummaryBoxes extends StatelessWidget {
   final double income;
@@ -291,7 +271,10 @@ class SummaryBoxes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final NumberFormat currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final NumberFormat currencyFormatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+    );
     return Row(
       children: [
         Expanded(
@@ -307,6 +290,45 @@ class SummaryBoxes extends StatelessWidget {
             title: "Expense",
             amount: currencyFormatter.format(expense),
             color: const Color(0xFFFFE2E2),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// NEW Widget for Debit & Loan and Repay summary boxes
+class LoanRepaySummaryBoxes extends StatelessWidget {
+  final double debitAndLoan;
+  final double repay;
+
+  const LoanRepaySummaryBoxes({
+    super.key,
+    required this.debitAndLoan,
+    required this.repay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final NumberFormat currencyFormatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+    );
+    return Row(
+      children: [
+        Expanded(
+          child: InfoBox(
+            title: "Debit & Loan",
+            amount: currencyFormatter.format(debitAndLoan),
+            color: const Color(0xFFF0E0FF), // Light purple/pink for outflows
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: InfoBox(
+            title: "Repay",
+            amount: currencyFormatter.format(repay),
+            color: const Color(0xFFE0FCE0), // Light green for inflows
           ),
         ),
       ],
@@ -330,13 +352,19 @@ class InfoBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title, style: const TextStyle(fontSize: 14)),
           const SizedBox(height: 5),
-          Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(
+            amount,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -360,14 +388,18 @@ class BudgetBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const blue = Color(0xFF3062CE);
-    final NumberFormat currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final NumberFormat currencyFormatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+    );
 
     String budgetText;
     String expenseText;
     Color expenseColor;
 
     if (monthlyBudget > 0) {
-      budgetText = '${currencyFormatter.format(dailyBudget)} / Day\nOf ${currencyFormatter.format(monthlyBudget)}';
+      budgetText =
+          '${currencyFormatter.format(dailyBudget)} / Day\nOf ${currencyFormatter.format(monthlyBudget)}';
       double remaining = monthlyBudget - totalExpense;
       expenseText = '${currencyFormatter.format(totalExpense)} Exp';
       expenseColor = (remaining < 0) ? Colors.red : Colors.green;
@@ -381,20 +413,27 @@ class BudgetBox extends StatelessWidget {
       onTap: onSetBudget,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: const Color(0xFFF7F7F7), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F7F7),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: [
-            const Icon(Icons.water_drop_outlined, size: 40, color: blue), // Placeholder icon
+            const Icon(
+              Icons.water_drop_outlined,
+              size: 40,
+              color: blue,
+            ), // Placeholder icon
             const SizedBox(width: 15),
             Expanded(
-              child: Text(
-                budgetText,
-                style: const TextStyle(fontSize: 14),
-              ),
+              child: Text(budgetText, style: const TextStyle(fontSize: 14)),
             ),
             Text(
               expenseText,
-              style: TextStyle(fontWeight: FontWeight.bold, color: expenseColor),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: expenseColor,
+              ),
             ),
             const SizedBox(width: 8),
             Icon(Icons.chevron_right, color: Colors.grey.shade500),
@@ -405,13 +444,9 @@ class BudgetBox extends StatelessWidget {
   }
 }
 
-// NEW: Widget to display the list of transactions
-class TransactionsList extends ConsumerWidget {
-  final List<Transaction> transactions;
-
-  const TransactionsList({super.key, required this.transactions});
-
-  static final Map<String, IconData> _categoryIcons = {
+// Category icon mapping for transaction categories
+class CategoryIconMapping {
+  static const Map<String, IconData> _categoryIcons = {
     'Run': Icons.directions_run,
     'Doctor': Icons.medical_services,
     'Medicine': Icons.medication,
@@ -446,28 +481,64 @@ class TransactionsList extends ConsumerWidget {
     'default': Icons.category,
   };
 
-  IconData _getCategoryIcon(String? categoryName) {
+  static IconData getCategoryIconStatic(String? categoryName) {
     if (categoryName == null) return _categoryIcons['default']!;
     return _categoryIcons[categoryName] ?? _categoryIcons['default']!;
   }
+}
+
+// NEW: Widget to display the list of transactions
+class TransactionsList extends ConsumerWidget {
+  final List<Transaction> transactions;
+
+  const TransactionsList({super.key, required this.transactions});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final NumberFormat currencyFormatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+    final NumberFormat currencyFormatter = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+    );
 
     return ListView.builder(
       itemCount: transactions.length,
       itemBuilder: (context, index) {
         final transaction = transactions[index];
-        final isExpense = transaction.type == 'Expense' || transaction.type == 'Debit & Loan';
-        final iconColor = isExpense ? Colors.red : Colors.green;
-        final amountColor = isExpense ? Colors.red : Colors.green;
-        final sign = isExpense ? '-' : '+';
-        
+        // Correctly determine if it's an expense or debit for icon/color
+        final isExpenseOrDebit =
+            transaction.type.toLowerCase() == 'expense' || transaction.type.toLowerCase() == 'debit & loan';
+        final isRepay = transaction.type.toLowerCase() == 'repay'; // Check for repay specifically
+        final isIncome = transaction.type.toLowerCase() == 'income'; // Define isIncome
+
+        Color iconColor;
+        Color amountColor;
+        String sign;
+
+        if (isExpenseOrDebit) {
+          iconColor = Colors.red;
+          amountColor = Colors.red;
+          sign = '-';
+        } else if (isRepay) {
+          iconColor = Colors.blueGrey; // Or a specific color for repay
+          amountColor = Colors.blueGrey; // Or a specific color for repay
+          sign = '-'; // Repay is also an outflow
+        } else if (isIncome) {
+          iconColor = Colors.green;
+          amountColor = Colors.green;
+          sign = '+';
+        } else {
+          // Default for any other type
+          iconColor = Colors.grey;
+          amountColor = Colors.grey;
+          sign = '';
+        }
+
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
           elevation: 0.5,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -475,12 +546,12 @@ class TransactionsList extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    // ignore: deprecated_member_use
                     color: iconColor.withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _getCategoryIcon(transaction.category),
+                    // Access the static getter for category icons from pocket_screen
+                    CategoryIconMapping.getCategoryIconStatic(transaction.category),
                     color: iconColor,
                     size: 24,
                   ),
@@ -491,13 +562,20 @@ class TransactionsList extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        transaction.category ?? transaction.type, // Show category or type
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        // Display category or type based on availability
+                        transaction.category ?? transaction.type,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        DateFormat('MMM dd, yyyy').format(transaction.date),
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        DateFormat('MMM dd, yyyy').format(transaction.date), // Corrected format to 'yyyy'
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -533,8 +611,24 @@ class BottomNav extends StatelessWidget {
         height: DashboardScreen._bottomNavHeight,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [ // Removed 'const' because of the onTap callback
-            const _NavItem(icon: Icons.home_outlined, label: 'Home', onTap: null), // Home functionality as before
+          children: [
+            _NavItem(
+              icon: Icons.home_outlined,
+              label: 'Home',
+              onTap: () {
+                // Navigate back to Dashboard. Current state should be preserved.
+                // For simplicity, just popping if it's not the first route, or navigating directly.
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => DashboardScreen(userName: 'User'),
+                    ),
+                  );
+                }
+              },
+            ), // Home functionality as before
             _NavItem(
               icon: Icons.pie_chart, // Icon for Report/Pocket
               label: 'Report', // Label for the button
@@ -545,8 +639,24 @@ class BottomNav extends StatelessWidget {
               },
             ),
             const SizedBox(width: 36), // Spacer for FAB
-            const _NavItem(icon: Icons.insert_chart_outlined, label: 'Stats'), // Stats functionality
-            const _NavItem(icon: Icons.credit_card_outlined, label: 'Wallet'), // Wallet functionality
+            _NavItem(
+              icon: Icons.insert_chart_outlined,
+              label: 'Stats',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const StatsScreen()),
+                );
+              },
+            ), // Stats functionality
+            _NavItem(
+              icon: Icons.credit_card_outlined,
+              label: 'Wallet',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const WalletScreen()),
+                );
+              },
+            ), // Wallet functionality
           ],
         ),
       ),
@@ -596,8 +706,11 @@ class AskAlButton extends StatelessWidget {
         color: const Color(0xFF3062CE), // Use a prominent blue for AI button
         shape: BoxShape.circle,
         boxShadow: [
-          // ignore: deprecated_member_use
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Material(
@@ -615,16 +728,27 @@ class AskAlButton extends StatelessWidget {
             } else {
               // Show a message to the user if they try to use AI without logging in
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please log in to use the AI Assistant.')),
+                const SnackBar(
+                  content: Text('Please log in to use the AI Assistant.'),
+                ),
               );
             }
           },
-          borderRadius: BorderRadius.circular(29), // Ensures the ripple effect is circular
+          borderRadius: BorderRadius.circular(
+            29,
+          ), // Ensures the ripple effect is circular
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.auto_awesome, size: 26, color: Colors.white), // AI or Sparkle icon
-              Text('AI', style: TextStyle(fontSize: 11, color: Colors.white)), // "AI" text
+              Icon(
+                Icons.auto_awesome,
+                size: 26,
+                color: Colors.white,
+              ), // AI or Sparkle icon
+              Text(
+                'AI',
+                style: TextStyle(fontSize: 11, color: Colors.white),
+              ), // "AI" text
             ],
           ),
         ),
