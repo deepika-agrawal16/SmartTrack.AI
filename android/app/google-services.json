@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "920584802323",
-    "project_id": "aifinancemanager-7944a",
-    "storage_bucket": "aifinancemanager-7944a.firebasestorage.app"
+    "project_number": "254202122552",
+    "project_id": "smarttrackai-5b5a6",
+    "storage_bucket": "smarttrackai-5b5a6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:920584802323:android:ea32e861961645c0372fe6",
+        "mobilesdk_app_id": "1:254202122552:android:b217ad4cca4fc46fee31cd",
         "android_client_info": {
           "package_name": "com.example.aifinanceapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "254202122552-qqjqatmcgsa0ioiavhon6ea734qsp7h7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDPWi2PIDm4OC1gKvGN6C2LETaQR7e7zGU"
+          "current_key": "AIzaSyBFTLVOLD4gMaTNSrJyIpzbgeHxuoq0rJY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "254202122552-qqjqatmcgsa0ioiavhon6ea734qsp7h7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

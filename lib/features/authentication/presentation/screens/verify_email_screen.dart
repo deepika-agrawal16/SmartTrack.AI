@@ -1,25 +1,32 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
-import 'package:aifinanceapp/screens/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 
-class VerifyEmailPage extends StatefulWidget {
+// Import auth providers from new path
+import 'package:aifinanceapp/features/authentication/presentation/providers/auth_provider.dart';
+
+class VerifyEmailPage extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
   final String email;
+  // Kept `fromGoogleSignIn` as per your original code, though its direct use might be reduced
+  final bool fromGoogleSignIn;
+
   const VerifyEmailPage({
     super.key,
     required this.email,
-    required bool fromGoogleSignIn,
+    required this.fromGoogleSignIn,
   });
 
   @override
-  State<VerifyEmailPage> createState() => _VerifyEmailPageState();
+  ConsumerState<VerifyEmailPage> createState() => _VerifyEmailPageState(); // Changed to ConsumerState
 }
 
-class _VerifyEmailPageState extends State<VerifyEmailPage> {
+class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> { // Changed to ConsumerState
   bool _isLoading = false;
   bool _isEmailVerified = false;
   Timer? _timer;
+
+  final Color _primaryColor = const Color.fromARGB(255, 48, 98, 206);
 
   @override
   void initState() {
@@ -39,6 +46,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   }
 
   Future<void> _checkEmailVerification() async {
+    // Reload the user to get the latest email verification status
     await FirebaseAuth.instance.currentUser?.reload();
     final isVerified =
         FirebaseAuth.instance.currentUser?.emailVerified ?? false;
@@ -48,34 +56,38 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
         setState(() {
           _isEmailVerified = true;
         });
-        _timer?.cancel();
+        _timer?.cancel(); // Stop the timer once verified
 
-        // Navigate to home screen or wherever you want after verification
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        // No explicit navigation here. main.dart's StreamBuilder will detect
+        // the verified state and route the user to UserSetupScreen or DashboardScreen.
+        // It's generally better to let the root widget handle top-level routing
+        // based on global authentication/onboarding state.
       }
     }
   }
 
   Future<void> _resendVerificationEmail() async {
+    // Access the AuthNotifier to send the verification email
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+
     try {
       setState(() {
         _isLoading = true;
       });
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await user.sendEmailVerification();
+      await authNotifier.sendEmailVerification(); // Use the AuthNotifier method
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Verification email sent!')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send verification email: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send verification email: ${e.toString()}')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -90,7 +102,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Verify Email'),
-        backgroundColor: const Color.fromARGB(255, 48, 98, 206),
+        backgroundColor: _primaryColor,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -101,22 +113,15 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
             Icon(
               _isEmailVerified ? Icons.verified : Icons.mark_email_unread,
               size: 80,
-              color: _isEmailVerified
-                  ? Colors.green
-                  : const Color.fromARGB(255, 48, 98, 206),
+              color: _isEmailVerified ? Colors.green : _primaryColor,
             ),
             const SizedBox(height: 24),
             Text(
               _isEmailVerified ? 'Email Verified!' : 'Verify Your Email',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Color.fromARGB(
-                  255,
-                  48,
-                  98,
-                  206,
-                ), // Changed to match app's primary color
+                color: _primaryColor,
               ),
             ),
             const SizedBox(height: 16),
@@ -140,7 +145,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                   : ElevatedButton(
                       onPressed: _resendVerificationEmail,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 48, 98, 206),
+                        backgroundColor: _primaryColor,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 12,
@@ -154,32 +159,39 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
+                  // Sign out and go back to the very first route (LandingPage)
                   FirebaseAuth.instance.signOut();
+                  // This pops all routes until the first one, which main.dart will then handle
+                  // and show LandingPage or Login based on auth state.
                   Navigator.popUntil(context, (route) => route.isFirst);
                 },
-                child: const Text(
+                child: Text(
                   'Back to Login',
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(color: _primaryColor, fontSize: 16), // Match primary color
                 ),
               ),
               const SizedBox(height: 24),
               const Text(
                 "Didn't receive the email? Check your spam folder.",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.grey), // Adjusted for better visibility
               ),
             ],
+            // If email is verified, show a "Continue" button
             if (_isEmailVerified) ...[
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  );
+                  // No explicit navigation here. main.dart's StreamBuilder will detect
+                  // the verified state and route the user to UserSetupScreen or DashboardScreen.
+                  // Just pop the current screen if it's not the root, or let main.dart handle.
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
+                  // Even if it can't pop, main.dart's StreamBuilder will kick in.
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 48, 98, 206),
+                  backgroundColor: _primaryColor,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,

@@ -1,78 +1,91 @@
-import 'package:aifinanceapp/screens/home_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:aifinanceapp/screens/auth_service.dart';
-import 'package:aifinanceapp/screens/signup_screen.dart';
-import 'package:aifinanceapp/screens/forget_password.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+// Import screens and providers from their new organized paths
+import 'package:aifinanceapp/features/authentication/presentation/providers/auth_provider.dart';
+import 'package:aifinanceapp/features/authentication/presentation/screens/verify_email_screen.dart'; // Update path for VerifyEmailPage
+import 'package:aifinanceapp/features/authentication/presentation/screens/login_screen.dart'; // Also need LoginPage for "Already have an account?" link
+
+class SignupPage extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
+  const SignupPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<SignupPage> createState() => _SignupPageState(); // Changed to ConsumerState
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _SignupPageState extends ConsumerState<SignupPage> { // Changed to ConsumerState
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _isLoading = false;
+  bool _obscureConfirmPassword = true;
+  bool _subscribeToNewsletter = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    final authNotifier = ref.read(authNotifierProvider.notifier); // Access the AuthNotifier
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      await authNotifier.signUpWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
 
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Login failed: ${e.message}')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      // If signup is successful, navigate to email verification.
+      // main.dart's StreamBuilder will then handle subsequent routing based on verified status.
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VerifyEmailPage(
+              email: _emailController.text.trim(),
+              fromGoogleSignIn: false, // This was part of your original logic
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = 'Signup failed: ${e.toString()}'; // General error message
+        // You can add more specific FirebaseAuthException checks here if desired
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
-    setState(() => _isLoading = true);
+    final authNotifier = ref.read(authNotifierProvider.notifier); // Access the AuthNotifier
 
     try {
-      final userCredential = await _authService.signInWithGoogle();
-      if (userCredential == null || !mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-
+      await authNotifier.signInWithGoogle();
+      // No explicit navigation here; main.dart handles it based on auth state
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google sign-in failed: ${e.toString()}')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the loading state from authNotifierProvider
+    final isLoading = ref.watch(authNotifierProvider);
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
@@ -89,7 +102,7 @@ class _LoginPageState extends State<LoginPage> {
 
               // Title
               const Text(
-                'Welcome Back',
+                'Get Started',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -98,7 +111,7 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "Sign in to continue to your account",
+                "Let's get started by filling out the form below.",
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 30),
@@ -147,37 +160,66 @@ class _LoginPageState extends State<LoginPage> {
                           },
                         ),
                       ),
-                      validator: (value) => value == null || value.isEmpty
-                          ? 'Please enter your password'
+                      validator: (value) => value == null || value.length < 6
+                          ? 'Password must be at least 6 characters'
                           : null,
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Forgot Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgetPasswordPage(),
-                          ),
-                        ),
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 48, 98, 206),
-                          ),
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 16),
 
+                    // Confirm Password Field
+                    TextFormField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscureConfirmPassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: (value) => value != _passwordController.text
+                          ? 'Passwords do not match'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Newsletter checkbox
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _subscribeToNewsletter,
+                          onChanged: (value) {
+                            setState(() {
+                              _subscribeToNewsletter = value!;
+                            });
+                          },
+                          activeColor: const Color.fromARGB(255, 48, 98, 206),
+                        ),
+                        const Flexible(
+                          child: Text(
+                            'I would like to subscribe to the newsletter and receive updates, tips, and exclusive offers.',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Create Account Button
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _login,
+                        onPressed: isLoading ? null : _signup, // Disable when loading
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color.fromARGB(
                             255,
@@ -189,12 +231,12 @@ class _LoginPageState extends State<LoginPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: _isLoading
+                        child: isLoading
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
                             : const Text(
-                                'Login',
+                                'Create Account',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -203,7 +245,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
                     ),
-                    const SizedBox(height: 24),
                     const SizedBox(height: 24),
 
                     // OR divider
@@ -221,25 +262,24 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
+
+                    // Continue with Google button
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleGoogleSignIn,
+                        onPressed: isLoading ? null : _handleGoogleSignIn, // Disable when loading
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.grey),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.g_mobiledata,
-                              color: Color.fromARGB(255, 48, 98, 206),
-                              size: 28,
-                            ),
+                            Image.asset('assets/images/google_logo.jpg', height: 28), // Use your google logo asset
                             const SizedBox(width: 10),
                             const Text(
                               'Continue with Google',
@@ -254,20 +294,20 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Don't have an account
+                    // Already have an account
                     TextButton(
-                      onPressed: _isLoading
+                      onPressed: isLoading
                           ? null
                           : () {
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const SignupPage(),
+                                  builder: (_) => const LoginPage(), // Link back to LoginPage
                                 ),
                               );
                             },
                       child: const Text(
-                        "Don't have an account? Sign Up here",
+                        'Already got an account? Log In here',
                         style: TextStyle(
                           color: Color.fromARGB(255, 48, 98, 206),
                           decoration: TextDecoration.underline,

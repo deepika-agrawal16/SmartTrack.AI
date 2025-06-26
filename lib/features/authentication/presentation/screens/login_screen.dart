@@ -1,100 +1,72 @@
-import 'package:aifinanceapp/screens/auth_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:aifinanceapp/screens/verify_email.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
 
-class SignupPage extends StatefulWidget {
-  const SignupPage({super.key});
+// Import screens and providers from their new organized paths
+import 'package:aifinanceapp/features/authentication/presentation/providers/auth_provider.dart';
+import 'package:aifinanceapp/features/authentication/presentation/screens/signup_screen.dart';
+import 'package:aifinanceapp/features/authentication/presentation/screens/forget_password_screen.dart'; // Assuming this will be its new path
+
+class LoginPage extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
+  const LoginPage({super.key});
 
   @override
-  State<SignupPage> createState() => _SignupPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState(); // Changed to ConsumerState
 }
 
-class _SignupPageState extends State<SignupPage> {
+class _LoginPageState extends ConsumerState<LoginPage> { // Changed to ConsumerState
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  final AuthService _authService = AuthService();
 
   bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
-  bool _subscribeToNewsletter = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _signup() async {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    final authNotifier = ref.read(authNotifierProvider.notifier); // Access the AuthNotifier
 
     try {
-      final userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-
-      await userCredential.user?.sendEmailVerification();
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VerifyEmailPage(
-            email: _emailController.text.trim(),
-            fromGoogleSignIn: false,
-          ),
-        ),
+      await authNotifier.signInWithEmail(
+        _emailController.text.trim(),
+        _passwordController.text.trim(),
       );
-    } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Signup failed: ${e.message}')));
-    } finally {
+      // No explicit navigation here; main.dart handles it based on auth state
+    } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed: ${e.toString()}')), // Display more general error
+        );
       }
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
-    setState(() {
-      _isLoading = true;
-    });
+    final authNotifier = ref.read(authNotifierProvider.notifier); // Access the AuthNotifier
 
     try {
-      final userCredential = await _authService.signInWithGoogle();
-      if (userCredential == null || !mounted) return;
-
-      Navigator.pushReplacementNamed(context, '/home');
+      await authNotifier.signInWithGoogle();
+      // No explicit navigation here; main.dart handles it based on auth state
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Google sign-in failed: $e')));
-    } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google sign-in failed: ${e.toString()}')),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the loading state from authNotifierProvider
+    final isLoading = ref.watch(authNotifierProvider);
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       backgroundColor: Colors.white,
@@ -111,7 +83,7 @@ class _SignupPageState extends State<SignupPage> {
 
               // Title
               const Text(
-                'Get Started',
+                'Welcome Back',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -120,7 +92,7 @@ class _SignupPageState extends State<SignupPage> {
               ),
               const SizedBox(height: 8),
               const Text(
-                "Let's get started by filling out the form below.",
+                "Sign in to continue to your account",
                 style: TextStyle(fontSize: 14, color: Colors.grey),
               ),
               const SizedBox(height: 30),
@@ -169,67 +141,37 @@ class _SignupPageState extends State<SignupPage> {
                           },
                         ),
                       ),
-                      validator: (value) => value == null || value.length < 6
-                          ? 'Password must be at least 6 characters'
+                      validator: (value) => value == null || value.isEmpty
+                          ? 'Please enter your password'
                           : null,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
 
-                    // Confirm Password Field
-                    TextFormField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm Password',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
+                    // Forgot Password
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ForgetPasswordPage(), // Update path
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword =
-                                  !_obscureConfirmPassword;
-                            });
-                          },
+                        ),
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 48, 98, 206),
+                          ),
                         ),
                       ),
-                      validator: (value) => value != _passwordController.text
-                          ? 'Passwords do not match'
-                          : null,
                     ),
                     const SizedBox(height: 16),
 
-                    // Newsletter checkbox
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _subscribeToNewsletter,
-                          onChanged: (value) {
-                            setState(() {
-                              _subscribeToNewsletter = value!;
-                            });
-                          },
-                          activeColor: const Color.fromARGB(255, 48, 98, 206),
-                        ),
-                        const Flexible(
-                          child: Text(
-                            'I would like to subscribe to the newsletter and receive updates, tips, and exclusive offers.',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Create Account Button
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _signup,
+                        onPressed: isLoading ? null : _login, // Disable when loading
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color.fromARGB(
                             255,
@@ -241,12 +183,12 @@ class _SignupPageState extends State<SignupPage> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: _isLoading
+                        child: isLoading
                             ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
                             : const Text(
-                                'Create Account',
+                                'Login',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -256,6 +198,7 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    const SizedBox(height: 24), // Keep this as per your original layout
 
                     // OR divider
                     Row(
@@ -272,13 +215,11 @@ class _SignupPageState extends State<SignupPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // Continue with Google button
                     SizedBox(
                       width: double.infinity,
                       height: 48,
                       child: OutlinedButton(
-                        onPressed: _isLoading ? null : _handleGoogleSignIn,
+                        onPressed: isLoading ? null : _handleGoogleSignIn, // Disable when loading
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.grey),
                           shape: RoundedRectangleBorder(
@@ -289,11 +230,7 @@ class _SignupPageState extends State<SignupPage> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(
-                              Icons.g_mobiledata,
-                              color: Color.fromARGB(255, 48, 98, 206),
-                              size: 28,
-                            ),
+                            Image.asset('assets/images/google_logo.jpg', height: 28), // Use your google logo asset
                             const SizedBox(width: 10),
                             const Text(
                               'Continue with Google',
@@ -308,15 +245,20 @@ class _SignupPageState extends State<SignupPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Already have an account
+                    // Don't have an account
                     TextButton(
-                      onPressed: _isLoading
+                      onPressed: isLoading
                           ? null
                           : () {
-                              Navigator.pop(context);
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SignupPage(), // Update path
+                                ),
+                              );
                             },
                       child: const Text(
-                        'Already got an account? Log In here',
+                        "Don't have an account? Sign Up here",
                         style: TextStyle(
                           color: Color.fromARGB(255, 48, 98, 206),
                           decoration: TextDecoration.underline,

@@ -1,5 +1,5 @@
-import 'package:aifinanceapp/screens/login_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:aifinanceapp/features/authentication/presentation/screens/login_screen.dart'; // Update import path
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -22,9 +22,8 @@ class LandingPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 40),
-            // Added the new greeting text
             const Text(
-              'Hello!! I will be your Money Tracker assistant!',
+              'Hello!! I am your Money Tracker assistant!',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -34,7 +33,7 @@ class LandingPage extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Track Smarter',
+              'SmartTrack.AI',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -43,7 +42,7 @@ class LandingPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              'With AI Assistant',
+              'Track smarter. Spend wiser. Powered by AI',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.white70,
@@ -51,18 +50,15 @@ class LandingPage extends StatelessWidget {
             ),
             const SizedBox(height: 40),
 
-            // Illustration - you might want to replace this with your own image
-            // that matches the design in your reference image
             Image.asset(
-              'assets/images/ai_logo.webp', // make sure to add the image in assets
+              'assets/images/ai_logo.webp',
               height: 200,
             ),
             const SizedBox(height: 60),
 
-            // Get Started Button
             ElevatedButton(
               onPressed: () {
-                // Navigate to login/signup screen
+                // Navigate to login screen
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -89,7 +85,6 @@ class LandingPage extends StatelessWidget {
 
             const SizedBox(height: 30),
             
-            // Returning user text
             TextButton(
               onPressed: () {
                 Navigator.push(
